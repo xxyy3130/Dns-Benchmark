@@ -20,12 +20,6 @@ The built-in resolver list contains only DNS servers located in mainland China, 
 
 The script uses only Python standard-library modules.
 
-### Built-in Domain Samples
-
-The ordinary-query set includes common Chinese and international sites, plus `store.steampowered.com` and `www.amap.com`.
-
-The sensitive-domain set includes Google, YouTube, Facebook, X/Twitter, Telegram, Wikipedia, GitHub, OpenAI, Instagram, Reddit, TikTok, and Discord. These domains provide a broader comparison set for filtering, blocking, and DNS pollution checks.
-
 ## Quick Start
 
 Run the default benchmark:
