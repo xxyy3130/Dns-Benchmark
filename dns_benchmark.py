@@ -323,11 +323,11 @@ def encode_name(name):
     return b"".join(bytes([len(label.encode("idna"))]) + label.encode("idna") for label in labels) + b"\x00"
 
 
-def make_query(name, qtype=1, dnssec=False):
+def make_query(name, dnssec=False):
     query_id = random.randrange(0, 65536)
     additional = 1 if dnssec else 0
     packet = struct.pack("!HHHHHH", query_id, 0x0100, 1, 0, 0, additional)
-    packet += encode_name(name) + struct.pack("!HH", qtype, 1)
+    packet += encode_name(name) + struct.pack("!HH", 1, 1)
     if dnssec:
         packet += b"\x00" + struct.pack("!HHIH", 41, 1232, 0x8000, 0)
     return query_id, packet
@@ -754,44 +754,6 @@ def _metric_text(value, suffix=""):
     return "-" if value is None else f"{value}{suffix}"
 
 
-def _legacy_write_txt_report(output, path, levels):
-    ranked = rank_resolvers(output["resolvers"], levels)
-    lines = [
-        "DNS Benchmark Report",
-        f"开始时间: {output['started_at']}",
-        f"结束时间: {output['finished_at']}",
-        f"参数: 普通查询重复={output['method']['latency_repeats']}, 请求数={output['method']['concurrent_requests']}, 并发档位={','.join(map(str, levels))}, 服务器并行数={output['method']['parallel_resolvers']}",
-        "排序: 普通查询成功率降序 -> 中位延迟升序 -> P95 升序 -> 64 路 QPS 降序 -> 128 路表现降序 -> 干净度降序",
-        "",
-        "排名\t名称\t服务器\t普通成功率\t中位延迟(ms)\tP95(ms)\t64路QPS\t128路表现(成功率/QPS)\t干净度\t状态",
-    ]
-    for rank, (label, result) in enumerate(ranked, 1):
-        latency = result.get("latency", {})
-        concurrency = result.get("concurrency", {})
-        clean = result.get("integrity", {}).get("cleanliness", {})
-        level64 = concurrency.get("64", {})
-        level128 = concurrency.get("128", {})
-        if not level128 and levels:
-            level128 = concurrency.get(str(max(levels)), {})
-        perf128 = "-"
-        if level128:
-            perf128 = f"{_metric_text(level128.get('success_pct'), '%')}/{_metric_text(level128.get('successful_qps'))}"
-        lines.append("\t".join([
-            str(rank), label, result.get("server", "-"),
-            _metric_text(latency.get("success_pct"), "%"),
-            _metric_text(latency.get("median_ms")), _metric_text(latency.get("p95_ms")),
-            _metric_text(level64.get("successful_qps")), perf128,
-            _metric_text(clean.get("score_pct"), "%"),
-            "跳过" if result.get("skipped") else "完成",
-        ]))
-    lines.extend([
-        "",
-        "干净度说明: NXDOMAIN 50% + 敏感域名无明显污染 20% + 有效 DNSSEC 15% + 伪造 DNSSEC 被拦截 10% + TCP 查询 5%。",
-    ])
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write("\n".join(lines) + "\n")
-
-
 async def async_main(args):
     token = f"codex-dns-{int(time.time())}-{random.randrange(100000)}"
     output = {
@@ -816,28 +778,9 @@ async def async_main(args):
     if args.json_output:
         with open(args.json_output, "w", encoding="utf-8") as handle:
             json.dump(output, handle, ensure_ascii=False, indent=2)
-    print(f"TXT 报告已保存: {args.output}")
+    print(f"TXT report saved: {args.output}")
     if args.json_output:
-        print(f"JSON 明细已保存: {args.json_output}")
-
-
-def _legacy_main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repeats", type=int, default=3)
-    parser.add_argument("--requests", type=int, default=192)
-    parser.add_argument("--concurrency-levels", default="64,128", help="并发测试档位，逗号分隔，默认 64,128")
-    parser.add_argument("--parallel-resolvers", type=int, default=32, help="同时测试的 DNS 服务器数量")
-    parser.add_argument("--timeout", type=float, default=1.5)
-    parser.add_argument("--output", required=True, help="TXT 报告路径")
-    parser.add_argument("--json-output", help="可选：保存完整 JSON 明细")
-    args = parser.parse_args()
-    if args.repeats < 1 or args.requests < 1 or args.parallel_resolvers < 1 or args.timeout <= 0:
-        parser.error("--repeats/--requests/--parallel-resolvers 必须大于 0，--timeout 必须为正数")
-    try:
-        args.concurrency_levels = parse_concurrency_levels(args.concurrency_levels)
-    except ValueError as exc:
-        parser.error(str(exc))
-    asyncio.run(async_main(args))
+        print(f"JSON details saved: {args.json_output}")
 
 
 def _fit_cell(value, width, align="left"):
