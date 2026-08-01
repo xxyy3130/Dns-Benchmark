@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import functools
+import ipaddress
 import json
 import random
 import socket
@@ -17,6 +18,21 @@ RESOLVERS = {
     "AliDNS-1": "223.5.5.5",
     "AliDNS-2": "223.6.6.6",
     "DNSPod-1": "119.29.29.29",
+    "Volcengine-IDC-1": "180.184.1.1",
+    "Volcengine-IDC-2": "180.184.2.2",
+    "Tsinghua-TUNA666": "101.6.6.6",
+    "USTC-LUG-1": "202.38.93.153",
+    "USTC-LUG-2": "202.141.162.123",
+    "HKBN-1": "203.80.96.10",
+    "HKBN-2": "203.80.96.9",
+    "HKBN-3": "203.186.94.20",
+    "HKBN-4": "203.186.94.22",
+    "HGC-1": "210.0.128.250",
+    "HGC-2": "210.0.128.251",
+    "I-CABLE-1": "61.10.0.130",
+    "I-CABLE-2": "61.10.1.130",
+    "CMHK-1": "203.142.100.18",
+    "CMHK-2": "203.142.100.21",
     "BaiduDNS-1": "180.76.76.76",
     "360DNS-1": "101.226.4.6",
     "360DNS-2": "218.30.118.6",
@@ -34,16 +50,16 @@ RESOLVERS = {
     "Auth-CN-4": "203.119.28.1",
     "Auth-CN-5": "203.119.29.1",
     "Auth-CN-6": "202.112.0.44",
-    "Auth-China-1": "125.208.32.1",
-    "Auth-China-2": "125.208.33.1",
-    "Auth-China-3": "125.208.34.1",
-    "Auth-China-4": "125.208.35.1",
-    "Auth-China-5": "125.208.36.1",
-    "Auth-Company-1": "125.208.40.1",
-    "Auth-Company-2": "125.208.41.1",
-    "Auth-Company-3": "125.208.42.1",
-    "Auth-Company-4": "125.208.43.1",
-    "Auth-Company-5": "125.208.44.1",
+    "Auth-CN-7": "125.208.32.1",
+    "Auth-CN-8": "125.208.33.1",
+    "Auth-CN-9": "125.208.34.1",
+    "Auth-CN-10": "125.208.35.1",
+    "Auth-CN-11": "125.208.36.1",
+    "Auth-CN-12": "125.208.40.1",
+    "Auth-CN-13": "125.208.41.1",
+    "Auth-CN-14": "125.208.42.1",
+    "Auth-CN-15": "125.208.43.1",
+    "Auth-CN-16": "125.208.44.1",
     "CT-Beijing-P1": "219.141.136.10",
     "CT-Beijing-B1": "219.141.140.10",
     "CT-Shanghai-P1": "202.96.209.133",
@@ -293,6 +309,68 @@ RESOLVERS = {
     "CM-Ningxia-P1": "218.203.123.116",
 }
 
+# Based on current longest-prefix BGP origins. Public DNS services using their
+# own Alibaba, Tencent, Volcengine, Baidu, CNNIC, or 114DNS networks remain
+# untagged.
+CARRIER_NAME_PREFIXES = {
+    "CT-": "Telecom",
+    "CU-": "Unicom",
+    "CM-": "Mobile",
+}
+
+CARRIER_IPS = {
+    "Telecom": {
+        "202.141.162.123",  # USTC-LUG-2, currently announced by AS4134
+        "101.226.4.6",      # 360DNS-1, China Telecom Shanghai
+        "218.30.118.6",     # 360DNS-2, China Telecom
+    },
+    "Unicom": set(),
+    "Mobile": set(),
+    "Tietong": set(),
+    "Education": {
+        "101.6.6.6",        # Tsinghua University / CERNET
+        "202.38.93.153",    # USTC / CERNET
+        "202.112.0.44",     # Auth-CN / CERNET
+        "203.119.25.1",
+        "203.119.26.1",
+        "203.119.27.1",
+        "203.119.28.1",
+        "203.119.29.1",
+        "125.208.32.1",
+        "125.208.33.1",
+        "125.208.34.1",
+        "125.208.35.1",
+        "125.208.36.1",
+        "125.208.40.1",
+        "125.208.41.1",
+        "125.208.42.1",
+        "125.208.43.1",
+        "125.208.44.1",
+    },
+}
+
+
+def _carrier_for_resolver(name, server):
+    for carrier, addresses in CARRIER_IPS.items():
+        if server in addresses:
+            return carrier
+    for prefix, carrier in CARRIER_NAME_PREFIXES.items():
+        if name.startswith(prefix):
+            return carrier
+    return None
+
+
+def _add_carrier_tags(resolvers):
+    tagged = {}
+    for name, server in resolvers.items():
+        carrier = _carrier_for_resolver(name, server)
+        display_name = f"[{carrier}] {name}" if carrier else name
+        tagged[display_name] = server
+    return tagged
+
+
+RESOLVERS = _add_carrier_tags(RESOLVERS)
+
 DOMAINS = [
     "baidu.com", "qq.com", "taobao.com", "jd.com", "bilibili.com",
     "douyin.com", "weibo.com", "zhihu.com", "gov.cn", "12306.cn",
@@ -305,6 +383,18 @@ SENSITIVE_DOMAINS = [
     "telegram.org", "www.wikipedia.org", "github.com", "openai.com",
     "www.instagram.com", "www.reddit.com", "www.tiktok.com", "discord.com",
 ]
+
+POLLUTION_PROBE_ROOTS = [
+    "google.com", "youtube.com", "facebook.com", "twitter.com",
+    "wikipedia.org", "telegram.org",
+]
+
+KNOWN_ANSWER_DOMAINS = {
+    "one.one.one.one": {"1.0.0.1", "1.1.1.1"},
+    "dns.google": {"8.8.4.4", "8.8.8.8"},
+}
+
+TRUSTED_DOH_LABELS = {"CloudflareDoH", "GoogleDoH"}
 
 
 def percentile(values, p):
@@ -425,7 +515,7 @@ def recv_exact(sock, length):
     return b"".join(chunks)
 
 
-def doh_json(endpoint, name, timeout=5):
+def doh_json(endpoint, name, timeout=3):
     url = endpoint + "?" + urllib.parse.urlencode({"name": name, "type": "A"})
     request = urllib.request.Request(url, headers={"accept": "application/dns-json", "user-agent": "dns-benchmark/1.0"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -566,14 +656,18 @@ async def async_tcp_query(server, name, timeout=1.5, dnssec=False):
                 pass
 
 
-async def run_latency_async(client, repeats):
-    samples = []
+async def run_latency_async(client, repeats, workers):
     ordered = DOMAINS * repeats
     random.shuffle(ordered)
-    for domain in ordered:
-        result = await client.query(domain)
-        result["domain"] = domain
-        samples.append(result)
+    gate = asyncio.Semaphore(workers)
+
+    async def one(domain):
+        async with gate:
+            result = await client.query(domain)
+            result["domain"] = domain
+            return result
+
+    samples = await asyncio.gather(*(one(domain) for domain in ordered))
     return summarize_queries(samples), samples
 
 
@@ -601,9 +695,12 @@ async def run_integrity_async(client, server, token):
     nonexistent = [f"{token}-{index}.invalid" for index in range(3)] + [
         f"{token}-{index}.example.com" for index in range(3)
     ]
-    nx_values, sensitive_values, valid_dnssec, bogus_dnssec, tcp = await asyncio.gather(
+    pollution_probes = build_pollution_probe_domains(token)
+    nx_values, sensitive_values, probe_values, known_values, valid_dnssec, bogus_dnssec, tcp = await asyncio.gather(
         asyncio.gather(*(client.query(name) for name in nonexistent)),
         asyncio.gather(*(client.query(name, dnssec=True) for name in SENSITIVE_DOMAINS)),
+        asyncio.gather(*(client.query(name) for name in pollution_probes)),
+        asyncio.gather(*(client.query(name) for name in KNOWN_ANSWER_DOMAINS)),
         client.query("cloudflare.com", dnssec=True),
         client.query("dnssec-failed.org", dnssec=True),
         async_tcp_query(server, "baidu.com"),
@@ -619,6 +716,8 @@ async def run_integrity_async(client, server, token):
         "nxdomain_total": len(nx_results),
         "nxdomain_results": nx_results,
         "sensitive_results": sensitive,
+        "pollution_probe_results": dict(zip(pollution_probes, probe_values)),
+        "known_answer_results": dict(zip(KNOWN_ANSWER_DOMAINS, known_values)),
         "dnssec_valid": valid_dnssec,
         "dnssec_bogus": bogus_dnssec,
         "tcp_query": tcp,
@@ -632,50 +731,209 @@ def _reference_answers(doh_references, domain):
     return answers
 
 
+def build_pollution_probe_domains(token):
+    return [
+        f"{token}-pollution-{index}.{root}"
+        for index, root in enumerate(POLLUTION_PROBE_ROOTS)
+    ]
+
+
+def _successful_references(doh_references, domain, labels=None):
+    references = []
+    for label, item in doh_references.get(domain, {}).items():
+        if labels is not None and label not in labels:
+            continue
+        if item.get("status") is not None and not item.get("error"):
+            references.append(item)
+    return references
+
+
+def _references_expect_no_address(doh_references, domain):
+    trusted = _successful_references(doh_references, domain, TRUSTED_DOH_LABELS)
+    references = trusted or _successful_references(doh_references, domain)
+    return bool(references) and all(
+        item.get("status") in (0, 3) and not item.get("answers")
+        for item in references
+    )
+
+
+def _suspicious_addresses(answers):
+    suspicious = []
+    for answer in answers:
+        try:
+            address = ipaddress.ip_address(answer)
+        except ValueError:
+            suspicious.append(answer)
+            continue
+        if not address.is_global:
+            suspicious.append(answer)
+    return suspicious
+
+
+def _reused_unverified_addresses(sensitive_results, doh_references):
+    domains_by_address = {}
+    for domain, result in sensitive_results.items():
+        references = _reference_answers(doh_references, domain)
+        for answer in result.get("answers", []):
+            if answer not in references:
+                domains_by_address.setdefault(answer, set()).add(domain)
+    return {
+        address: sorted(domains)
+        for address, domains in domains_by_address.items()
+        if len(domains) >= 3
+    }
+
+
 def calculate_cleanliness(integrity, doh_references):
     total = integrity.get("nxdomain_total", 0)
     nxdomain_pct = integrity.get("nxdomain_clean", 0) / total if total else 0
     sensitive_results = integrity.get("sensitive_results", {})
-    sensitive_clean = 0
+    reused_addresses = _reused_unverified_addresses(sensitive_results, doh_references)
+    sensitive_credit = 0.0
+    sensitive_checks = {}
     for domain, result in sensitive_results.items():
         expected = _reference_answers(doh_references, domain)
         answers = set(result.get("answers", []))
-        no_obvious_pollution = not expected or not answers or answers.intersection(expected)
-        if result.get("ok") and no_obvious_pollution:
-            sensitive_clean += 1
-    sensitive_pct = sensitive_clean / len(sensitive_results) if sensitive_results else 0
+        suspicious = _suspicious_addresses(answers)
+        reused = sorted(answer for answer in answers if answer in reused_addresses)
+        if not result.get("ok"):
+            verdict = "query_failed"
+            credit = 0.0
+        elif result.get("rcode") != 0:
+            verdict = f"rcode_{result.get('rcode')}"
+            credit = 0.0
+        elif not answers:
+            verdict = "empty_answer"
+            credit = 0.0
+        elif suspicious:
+            verdict = "non_global_address"
+            credit = 0.0
+        elif reused:
+            verdict = "cross_domain_reuse"
+            credit = 0.0
+        elif expected and answers.intersection(expected):
+            verdict = "reference_match"
+            credit = 1.0
+        elif expected:
+            verdict = "reference_mismatch_unverified"
+            credit = 0.5
+        else:
+            verdict = "plausible_no_reference"
+            credit = 0.5
+        sensitive_credit += credit
+        clean = True if credit == 1.0 else False if credit == 0.0 else None
+        sensitive_checks[domain] = {
+            "clean": clean,
+            "score_credit": credit,
+            "verdict": verdict,
+            "answers": sorted(answers),
+            "reference_answers": sorted(expected),
+            "suspicious_answers": suspicious,
+            "reused_answers": reused,
+        }
+    sensitive_pct = sensitive_credit / len(sensitive_results) if sensitive_results else 0
+
+    probe_results = integrity.get("pollution_probe_results", {})
+    probe_clean = 0
+    probe_evaluated = 0
+    probe_checks = {}
+    for domain, result in probe_results.items():
+        expected_empty = _references_expect_no_address(doh_references, domain)
+        answers = set(result.get("answers", []))
+        if not expected_empty:
+            verdict = "reference_inconclusive"
+            clean = None
+        elif not result.get("ok"):
+            verdict = "query_failed"
+            clean = False
+        elif answers:
+            verdict = "injected_address"
+            clean = False
+        elif result.get("rcode") in (0, 3):
+            verdict = "clean_negative"
+            clean = True
+        else:
+            verdict = f"rcode_{result.get('rcode')}"
+            clean = False
+        if clean is not None:
+            probe_evaluated += 1
+            probe_clean += int(clean)
+        probe_checks[domain] = {
+            "clean": clean,
+            "verdict": verdict,
+            "answers": sorted(answers),
+            "reference_expected_empty": expected_empty,
+        }
+    probe_pct = probe_clean / probe_evaluated if probe_evaluated else 0
+
+    known_results = integrity.get("known_answer_results", {})
+    known_clean = 0
+    known_checks = {}
+    for domain, expected in KNOWN_ANSWER_DOMAINS.items():
+        result = known_results.get(domain, {})
+        answers = set(result.get("answers", []))
+        clean = bool(result.get("ok") and result.get("rcode") == 0 and answers.intersection(expected))
+        known_clean += int(clean)
+        known_checks[domain] = {
+            "clean": clean,
+            "answers": sorted(answers),
+            "expected_answers": sorted(expected),
+        }
+    known_pct = known_clean / len(KNOWN_ANSWER_DOMAINS) if KNOWN_ANSWER_DOMAINS else 0
+
     valid_result = integrity.get("dnssec_valid", {})
     bogus_result = integrity.get("dnssec_bogus", {})
     valid_dnssec = bool(valid_result.get("ok") and valid_result.get("flags", {}).get("ad"))
     bogus_blocked = bool(bogus_result.get("ok") and bogus_result.get("rcode") in (2, 5))
     tcp_ok = bool(integrity.get("tcp_query", {}).get("ok"))
-    score = 100 * (0.50 * nxdomain_pct + 0.20 * sensitive_pct +
-                   0.15 * valid_dnssec + 0.10 * bogus_blocked + 0.05 * tcp_ok)
+    components = [
+        (0.30, nxdomain_pct, total > 0),
+        (0.30, probe_pct, probe_evaluated > 0),
+        (0.25, sensitive_pct, bool(sensitive_results)),
+        (0.05, known_pct, bool(known_results)),
+        (0.05, float(valid_dnssec), True),
+        (0.03, float(bogus_blocked), True),
+        (0.02, float(tcp_ok), True),
+    ]
+    active_weight = sum(weight for weight, _, active in components if active)
+    weighted_score = sum(weight * value for weight, value, active in components if active)
+    score = 100 * weighted_score / active_weight if active_weight else 0
     return {
         "score_pct": round(score, 2),
         "nxdomain_pct": round(100 * nxdomain_pct, 2),
+        "pollution_probe_pct": round(100 * probe_pct, 2),
+        "pollution_probe_evaluated": probe_evaluated,
+        "active_weight_pct": round(100 * active_weight, 2),
         "sensitive_pct": round(100 * sensitive_pct, 2),
+        "known_answer_pct": round(100 * known_pct, 2),
         "dnssec_valid": valid_dnssec,
         "dnssec_bogus_blocked": bogus_blocked,
         "tcp_pct": 100 if tcp_ok else 0,
+        "suspected_reused_addresses": reused_addresses,
+        "sensitive_checks": sensitive_checks,
+        "pollution_probe_checks": probe_checks,
+        "known_answer_checks": known_checks,
     }
 
 
-async def collect_doh_references():
+async def collect_doh_references(domains, trusted_only_domains, timeout):
     endpoints = {
+        "GoogleDoH": "https://dns.google/resolve",
+        "CloudflareDoH": "https://cloudflare-dns.com/dns-query",
         "AliDoH": "https://dns.alidns.com/resolve",
         "DNSPodDoH": "https://doh.pub/resolve",
-        "CloudflareDoH": "https://cloudflare-dns.com/dns-query",
     }
+    trusted_only_domains = set(trusted_only_domains)
     loop = asyncio.get_running_loop()
     jobs = {
         (domain, label): loop.run_in_executor(
-            None, functools.partial(doh_json, endpoint, domain)
+            None, functools.partial(doh_json, endpoint, domain, timeout)
         )
-        for domain in SENSITIVE_DOMAINS
+        for domain in domains
         for label, endpoint in endpoints.items()
+        if domain not in trusted_only_domains or label in TRUSTED_DOH_LABELS
     }
-    references = {domain: {} for domain in SENSITIVE_DOMAINS}
+    references = {domain: {} for domain in domains}
     for (domain, label), job in jobs.items():
         try:
             references[domain][label] = await job
@@ -684,7 +942,7 @@ async def collect_doh_references():
     return references
 
 
-async def run_resolver_async(label, server, args, token, doh_references):
+async def run_resolver_async(label, server, args, token):
     print(f"Testing {label} {server}", flush=True)
     client = AsyncDnsClient(server, args.timeout)
     try:
@@ -693,9 +951,10 @@ async def run_resolver_async(label, server, args, token, doh_references):
         reachability = summarize_queries(reachability_samples)
         if not any(item["ok"] for item in reachability_samples):
             return {"server": server, "reachability": reachability, "skipped": True}
-        latency_summary, latency_samples = await run_latency_async(client, args.repeats)
+        latency_summary, latency_samples = await run_latency_async(
+            client, args.repeats, args.latency_workers
+        )
         integrity = await run_integrity_async(client, server, token)
-        integrity["cleanliness"] = calculate_cleanliness(integrity, doh_references)
         concurrency = {}
         for workers in args.concurrency_levels:
             concurrency[str(workers)] = await run_concurrency_async(client, workers, args.requests)
@@ -733,18 +992,20 @@ def rank_resolvers(resolvers, levels):
         latency = result.get("latency", {})
         concurrency = result.get("concurrency", {})
         clean = result.get("integrity", {}).get("cleanliness", {})
+        clean_score = clean.get("score_pct")
         qps64 = concurrency.get(level64, {}).get("successful_qps")
         perf128 = concurrency.get(level128, {}).get("successful_qps")
         if perf128 is None and level128 not in concurrency and levels:
             perf128 = concurrency.get(str(max(levels)), {}).get("successful_qps")
         return (
             bool(result.get("skipped")),
+            not result.get("skipped") and clean_score is not None and clean_score <= 10,
             -_number(latency.get("success_pct"), -1),
             _number(latency.get("median_ms"), float("inf")),
             _number(latency.get("p95_ms"), float("inf")),
+            -_number(clean_score, -1),
             -_number(qps64, -1),
             -_number(perf128, -1),
-            -_number(clean.get("score_pct"), -1),
         )
 
     return sorted(resolvers.items(), key=key)
@@ -756,31 +1017,66 @@ def _metric_text(value, suffix=""):
 
 async def async_main(args):
     token = f"codex-dns-{int(time.time())}-{random.randrange(100000)}"
+    pollution_probe_domains = build_pollution_probe_domains(token)
+    reference_domains = SENSITIVE_DOMAINS + pollution_probe_domains
+    doh_task = asyncio.create_task(
+        collect_doh_references(
+            reference_domains, pollution_probe_domains, args.doh_timeout
+        )
+    )
     output = {
         "started_at": datetime.now(timezone.utc).astimezone().isoformat(),
         "method": {
             "latency_repeats": args.repeats, "concurrent_requests": args.requests,
             "concurrency_levels": args.concurrency_levels,
-            "parallel_resolvers": args.parallel_resolvers, "timeout": args.timeout,
+            "parallel_resolvers": args.parallel_resolvers,
+            "latency_workers": args.latency_workers,
+            "timeout": args.timeout, "doh_timeout": args.doh_timeout,
         },
-        "resolvers": {}, "doh_references": await collect_doh_references(),
+        "resolvers": {}, "doh_references": {},
     }
     resolver_gate = asyncio.Semaphore(args.parallel_resolvers)
+    completed = 0
+    total = len(RESOLVERS)
+    print(
+        f"Starting {total} resolver tests; DoH references are loading in background.",
+        flush=True,
+    )
 
     async def one(label, server):
+        nonlocal completed
         async with resolver_gate:
-            return label, await run_resolver_async(label, server, args, token, output["doh_references"])
+            started = time.perf_counter()
+            result = await run_resolver_async(label, server, args, token)
+            completed += 1
+            status = "SKIP" if result.get("skipped") else "DONE"
+            elapsed = time.perf_counter() - started
+            print(
+                f"Completed {label} {server} [{completed}/{total}] "
+                f"{status} in {elapsed:.1f}s",
+                flush=True,
+            )
+            return label, result
 
     results = await asyncio.gather(*(one(label, server) for label, server in RESOLVERS.items()))
     output["resolvers"] = dict(results)
+    if not doh_task.done():
+        print("Resolver tests finished; waiting for DoH references...", flush=True)
+    output["doh_references"] = await doh_task
+    for result in output["resolvers"].values():
+        integrity = result.get("integrity")
+        if integrity is not None:
+            integrity["cleanliness"] = calculate_cleanliness(
+                integrity, output["doh_references"]
+            )
     output["finished_at"] = datetime.now(timezone.utc).astimezone().isoformat()
     write_txt_report(output, args.output, args.concurrency_levels)
+    print(f"TXT report saved: {args.output}", flush=True)
     if args.json_output:
+        print(f"Writing JSON details: {args.json_output}", flush=True)
         with open(args.json_output, "w", encoding="utf-8") as handle:
             json.dump(output, handle, ensure_ascii=False, indent=2)
-    print(f"TXT report saved: {args.output}")
-    if args.json_output:
-        print(f"JSON details saved: {args.json_output}")
+        print(f"JSON details saved: {args.json_output}", flush=True)
 
 
 def _fit_cell(value, width, align="left"):
@@ -828,18 +1124,18 @@ def write_txt_report(output, path, levels):
             _metric_text(latency.get("success_pct"), "%"),
             _metric_text(latency.get("median_ms")),
             _metric_text(latency.get("p95_ms")),
+            _metric_text(clean.get("score_pct"), "%"),
             _metric_text(level64.get("successful_qps")),
             _metric_text(level128.get("success_pct"), "%"),
             _metric_text(level128.get("successful_qps")),
-            _metric_text(clean.get("score_pct"), "%"),
             "SKIP" if result.get("skipped") else "DONE",
         ])
 
     headers = [
         "Rank", "Name", "Resolver", "Success", "DNSMed(ms)", "P95(ms)",
-        "QPS@64", "128 OK", "QPS@128", "Clean", "Status",
+        "Clean", "QPS@64", "128 OK", "QPS@128", "Status",
     ]
-    widths = [4, 20, 15, 9, 10, 9, 9, 8, 9, 7, 6]
+    widths = [4, 34, 15, 9, 10, 9, 7, 9, 8, 9, 6]
     alignments = ["right", "left", "left", "right", "right", "right", "right", "right", "right", "right", "center"]
     lines = [
         "DNS Benchmark Report",
@@ -848,8 +1144,8 @@ def write_txt_report(output, path, levels):
         f"Finish: {output['finished_at']}",
         "Config:",
         f"  Latency repeats={output['method']['latency_repeats']} | Requests/level={output['method']['concurrent_requests']} | Levels={','.join(map(str, levels))}",
-        f"  Parallel resolvers={output['method']['parallel_resolvers']} | Timeout={output['method']['timeout']}s",
-        "Sort  : Success(desc), DNS median(asc), DNS P95(asc), QPS@64(desc), 128 performance(desc), Clean(desc)",
+        f"  Parallel resolvers={output['method']['parallel_resolvers']} | Latency workers={output['method']['latency_workers']} | Timeout={output['method']['timeout']}s | DoH timeout={output['method']['doh_timeout']}s",
+        "Sort  : DONE Clean>10 first, DONE Clean<=10 next, SKIP last; within DONE groups: Success(desc), DNS median(asc), DNS P95(asc), Clean(desc), QPS@64(desc), 128 performance(desc)",
         "",
     ]
     lines.extend(_render_table(headers, rows, widths, alignments))
@@ -858,7 +1154,9 @@ def write_txt_report(output, path, levels):
         "Notes:",
         "  Latency is DNS UDP round-trip time, not ICMP ping RTT; DNS caching and resolver processing can make it differ from ping.",
         "  128 OK = success rate at 128 concurrent requests; QPS columns count successful responses.",
-        "  Clean score = NXDOMAIN 50% + sensitive domains 20% + valid DNSSEC 15% + bogus DNSSEC blocked 10% + TCP 5%.",
+        "  Clean score = NXDOMAIN 30% + pollution probes 30% + sensitive domains 25% + known answers 5% + valid DNSSEC 5% + bogus DNSSEC blocked 3% + TCP 2%.",
+        "  Pollution probes use randomized sensitive subdomains and trusted DoH baselines; unavailable baseline weights are excluded.",
+        "  Exact IP mismatches alone are inconclusive because CDN and geographic answers can differ; JSON output includes per-domain verdicts.",
     ])
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines) + "\n")
@@ -870,12 +1168,15 @@ def main():
     parser.add_argument("--requests", type=int, default=192)
     parser.add_argument("--concurrency-levels", default="64,128", help="Comma-separated concurrency levels (default: 64,128)")
     parser.add_argument("--parallel-resolvers", type=int, default=32, help="Resolvers tested at the same time")
+    parser.add_argument("--latency-workers", type=int, default=4, help="Low-concurrency workers per resolver for ordinary latency samples (default: 4)")
     parser.add_argument("--timeout", type=float, default=1.5)
+    parser.add_argument("--doh-timeout", type=float, default=3.0, help="Timeout for each DNS-over-HTTPS reference query (default: 3.0)")
     parser.add_argument("--output", required=True, help="TXT report path")
     parser.add_argument("--json-output", help="Optional full JSON detail path")
     args = parser.parse_args()
-    if args.repeats < 1 or args.requests < 1 or args.parallel_resolvers < 1 or args.timeout <= 0:
-        parser.error("--repeats/--requests/--parallel-resolvers must be positive and --timeout must be greater than zero")
+    if (args.repeats < 1 or args.requests < 1 or args.parallel_resolvers < 1 or
+            args.latency_workers < 1 or args.timeout <= 0 or args.doh_timeout <= 0):
+        parser.error("count options must be positive and timeouts must be greater than zero")
     try:
         args.concurrency_levels = parse_concurrency_levels(args.concurrency_levels)
     except ValueError as exc:
