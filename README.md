@@ -1,12 +1,13 @@
-# Dns-Benchmark
-An asynchronous DNS resolver benchmark that measures query reliability, latency, concurrency throughput, and resolver cleanliness across a large built-in resolver list.
+# DNS Benchmark
 
-The built-in resolver list contains only DNS servers located in mainland China, including public, ISP, enterprise, education-network, and authoritative DNS services. Overseas public resolvers are not included in the benchmark list.
+**Description:** An asynchronous DNS resolver benchmark that measures query reliability, latency, concurrency throughput, and resolver cleanliness across a large built-in resolver list.
+
+**Resolver scope:** The built-in resolver list focuses on mainland China and Hong Kong, including public, ISP, enterprise, education-network, and authoritative DNS services.
 
 ## Features
 
 - Runs multiple resolvers in parallel to reduce total benchmark time.
-- Tests only the built-in mainland-China DNS resolver list.
+- Tests the built-in mainland-China and Hong Kong DNS resolver list.
 - Measures ordinary query success rate, median latency, and P95 latency.
 - Tests configurable concurrency levels, including 64 and 128 by default.
 - Checks NXDOMAIN behavior, sensitive domains, DNSSEC, and TCP fallback.
@@ -20,6 +21,18 @@ The built-in resolver list contains only DNS servers located in mainland China, 
 
 The script uses only Python standard-library modules.
 
+## Resolver Labels
+
+Mainland resolver names include an English network label when their current longest-prefix BGP origin belongs to one of the supported network classes:
+
+- `[Telecom]`: China Telecom
+- `[Unicom]`: China Unicom
+- `[Mobile]`: China Mobile
+- `[Tietong]`: China Tietong; reserved for independently announced Tietong networks
+- `[Education]`: CERNET or an education-network address
+
+Branded public DNS and IDC services using their own Alibaba, Tencent, Volcengine, Baidu, CNNIC-SDNS, or 114DNS networks remain untagged. The built-in addresses were checked on 2026-08-01; `202.141.162.123` is labelled `Telecom` because its current longest-prefix route is announced by China Telecom rather than CERNET. `Auth-CN-1` through `Auth-CN-16`, covering `203.119.*`, `202.112.0.44`, and the listed `125.208.*` addresses, are explicitly labelled `Education`. No current built-in resolver matched an independently announced Tietong network.
+
 ## Quick Start
 
 Run the default benchmark:
@@ -31,10 +44,12 @@ py dns_benchmark.py --output dns_benchmark.txt
 The default settings are:
 
 - Three ordinary-query repeats per domain
+- Four ordinary latency queries in flight per resolver
 - 192 requests for each concurrency level
 - 64 and 128 concurrent requests
 - 32 resolvers tested at the same time
 - A 1.5-second DNS query timeout
+- A 3-second DNS-over-HTTPS reference timeout
 
 ## Usage
 
@@ -50,7 +65,9 @@ py dns_benchmark.py [options]
 | `--requests N` | `192` | Number of requests sent for each concurrency level. |
 | `--concurrency-levels LIST` | `64,128` | Comma-separated concurrency levels, for example `32,64,128`. |
 | `--parallel-resolvers N` | `32` | Maximum number of DNS resolvers tested at the same time. Increase carefully because it creates more network traffic. |
+| `--latency-workers N` | `4` | Low-concurrency workers used for ordinary latency samples. Use `1` for strictly sequential sampling; higher values reduce the impact of repeated timeouts. |
 | `--timeout SECONDS` | `1.5` | Timeout for individual UDP DNS queries. |
+| `--doh-timeout SECONDS` | `3.0` | Timeout for each DNS-over-HTTPS reference query. DoH collection runs in the background alongside resolver tests. |
 | `--output PATH` | Required | Path of the tab-separated TXT ranking report. |
 | `--json-output PATH` | None | Optional path for complete JSON data, including per-query samples and integrity details. |
 
@@ -68,16 +85,34 @@ Use more latency samples and test three concurrency levels:
 py dns_benchmark.py --repeats 5 --requests 256 --concurrency-levels 32,64,128 --parallel-resolvers 16 --timeout 2 --output results.txt
 ```
 
+Use faster ordinary latency sampling and a shorter DoH reference timeout:
+
+```bash
+py dns_benchmark.py --latency-workers 8 --doh-timeout 2 --output results.txt
+```
+
+Use strictly sequential ordinary latency sampling for the lowest per-resolver test load:
+
+```bash
+py dns_benchmark.py --latency-workers 1 --output results.txt
+```
+
 ## Output
 
-The TXT report is sorted by:
+The TXT report is grouped in this order:
+
+1. Completed resolvers with `Clean > 10%`
+2. Completed resolvers with `Clean <= 10%`
+3. Skipped resolvers
+
+Within each completed group, results are sorted by:
 
 1. Ordinary query success rate, descending
 2. DNS median latency, ascending
 3. DNS P95 latency, ascending
-4. 64-way successful QPS, descending
-5. 128-way performance, descending
-6. Cleanliness score, descending
+4. Cleanliness score, descending
+5. 64-way successful QPS, descending
+6. 128-way performance, descending
 
 The main table uses fixed-width fields separated by tab characters. Open it with a monospace font and a consistent tab-stop setting for the best alignment.
 
@@ -88,7 +123,7 @@ The table includes:
 - `Success`: ordinary query success rate
 - `DNSMed(ms)`: median latency of successful ordinary DNS queries
 - `P95(ms)`: 95th-percentile latency
+- `Clean`: weighted resolver cleanliness score based on randomized NXDOMAIN checks, randomized sensitive-subdomain pollution probes, sensitive-domain results, known-answer checks, DNSSEC behavior, and DNS-over-TCP support. Exact IP mismatches are treated as inconclusive because CDN and geographic answers can differ. Unavailable DoH-baseline weights are excluded, and per-domain verdicts are included in the optional JSON report.
 - `QPS@64`: successful queries per second at 64-way concurrency
 - `128 OK`: success rate at 128-way concurrency
 - `QPS@128`: successful queries per second at 128-way concurrency
-- `Clean`: weighted resolver cleanliness score
