@@ -6,12 +6,36 @@
     "retained_existing_entries": 307,
     "removed_entries": [],
     "added_entries": [
-      "240e:46:4888::4888"
+      "240e:46:4888::4888",
+      "2001:dc7:1000::1",
+      "2001:da8:8000:1:202:120:2:101",
+      "2001:da8:202:10::36",
+      "2001:da8:202:10::37",
+      "2001:da8:208:10::6",
+      "240e:56:4000:8000::69",
+      "240e:56:4000::218",
+      "240e:5a::6666",
+      "240e:5b::6666",
+      "240e:47:0:701::1",
+      "240e:1c:200::1",
+      "240e:1c:200::2",
+      "240e:1f:1::1",
+      "240e:1f:1::33",
+      "2408:8663::2",
+      "2408:8662::2",
+      "2408:8000:aaaa::",
+      "2409:8062:2000:1::1",
+      "2409:8062:2000:1::2",
+      "2409:8028:2000::1111",
+      "2409:8028:2000::2222",
+      "1.1.8.8",
+      "1.1.8.9",
+      "112.121.178.187"
     ],
     "evidence_summary": {
       "ipv4_entries_covered_by_prefix_routing_audit": 280,
-      "ipv4_entries_checked_with_current_direct_sources": 12,
-      "ipv6_entries_checked_with_current_lists_or_provider_sources": 15,
+      "ipv4_entries_checked_with_current_direct_sources": 15,
+      "ipv6_entries_checked_with_current_lists_or_provider_sources": 37,
       "local_successes_used_only_as_positive_evidence": 63
     },
     "policy": "Local timeout or REFUSED is not deletion evidence. Remove only with loss of routing, an official retirement, or corroborated current-source evidence.",
@@ -1533,6 +1557,126 @@
       "name": "CM-Ningxia-P1",
       "server": "218.203.123.116",
       "label": "Mobile"
+    },
+    {
+      "name": "Auth-CN-v6-D",
+      "server": "2001:dc7:1000::1",
+      "label": "CNNIC"
+    },
+    {
+      "name": "SJTU-v6-2",
+      "server": "2001:da8:8000:1:202:120:2:101",
+      "label": "Education"
+    },
+    {
+      "name": "BUPT-v6-1",
+      "server": "2001:da8:202:10::36",
+      "label": "Education"
+    },
+    {
+      "name": "BUPT-v6-2",
+      "server": "2001:da8:202:10::37",
+      "label": "Education"
+    },
+    {
+      "name": "USTB-v6-1",
+      "server": "2001:da8:208:10::6",
+      "label": "Education"
+    },
+    {
+      "name": "CT-Sichuan-v6-P1",
+      "server": "240e:56:4000:8000::69",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Sichuan-v6-B1",
+      "server": "240e:56:4000::218",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Jiangsu-v6-P1",
+      "server": "240e:5a::6666",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Jiangsu-v6-B1",
+      "server": "240e:5b::6666",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Shandong-v6-P1",
+      "server": "240e:47:0:701::1",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Zhejiang-v6-P1",
+      "server": "240e:1c:200::1",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Zhejiang-v6-B1",
+      "server": "240e:1c:200::2",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Guangdong-v6-P1",
+      "server": "240e:1f:1::1",
+      "label": "Telecom"
+    },
+    {
+      "name": "CT-Guangdong-v6-B1",
+      "server": "240e:1f:1::33",
+      "label": "Telecom"
+    },
+    {
+      "name": "CU-Hunan-v6-P1",
+      "server": "2408:8663::2",
+      "label": "Unicom"
+    },
+    {
+      "name": "CU-Hunan-v6-B1",
+      "server": "2408:8662::2",
+      "label": "Unicom"
+    },
+    {
+      "name": "CU-Jiangsu-v6-P1",
+      "server": "2408:8000:aaaa::",
+      "label": "Unicom"
+    },
+    {
+      "name": "CM-Sichuan-v6-P1",
+      "server": "2409:8062:2000:1::1",
+      "label": "Mobile"
+    },
+    {
+      "name": "CM-Sichuan-v6-B1",
+      "server": "2409:8062:2000:1::2",
+      "label": "Mobile"
+    },
+    {
+      "name": "CM-Zhejiang-v6-P1",
+      "server": "2409:8028:2000::1111",
+      "label": "Mobile"
+    },
+    {
+      "name": "CM-Zhejiang-v6-B1",
+      "server": "2409:8028:2000::2222",
+      "label": "Mobile"
+    },
+    {
+      "name": "YamuDNS-1",
+      "server": "1.1.8.8",
+      "label": "Yamu"
+    },
+    {
+      "name": "YamuDNS-2",
+      "server": "1.1.8.9",
+      "label": "Yamu"
+    },
+    {
+      "name": "Netsec-DNS-1",
+      "server": "112.121.178.187",
+      "label": "HongKong"
     }
   ]
 }
