@@ -39,33 +39,6 @@ Mainland resolver names include an English network label when their current long
 
 Branded IPv4 public DNS and IDC services using their own Alibaba, Tencent, Volcengine, Baidu, CNNIC-SDNS, or 114DNS networks remain untagged. Every built-in IPv6 resolver has an explicit English label. The built-in addresses were checked on 2026-08-04; `202.141.162.123` is labelled `Telecom` because its current longest-prefix route is announced by China Telecom rather than CERNET. `Auth-CN-1` through `Auth-CN-16`, covering `203.119.*`, `202.112.0.44`, and the listed `125.208.*` addresses, are explicitly labelled `Education`. No current built-in resolver matched an independently announced Tietong network.
 
-## Built-in IPv6 Resolvers
-
-| Label | Name | Address |
-| --- | --- | --- |
-| `[Education]` | Tsinghua-TUNA666-v6 | `2001:da8::666` |
-| `[Tencent]` | DNSPod-v6-1 | `2402:4e00::` |
-| `[Tencent]` | DNSPod-v6-2 | `2402:4e00:1::` |
-| `[Alibaba]` | AliDNS-v6-1 | `2400:3200::1` |
-| `[Alibaba]` | AliDNS-v6-2 | `2400:3200:baba::1` |
-| `[Baidu]` | BaiduDNS-v6 | `2400:da00::6666` |
-| `[Public]` | China-IPv6-DNS-1 | `240c::6666` |
-| `[Public]` | China-IPv6-DNS-2 | `240c::6644` |
-| `[Education]` | CSTNET-v6 | `2001:cc0::1` |
-| `[Telecom]` | CT-China-v6-P1 | `240e:4c:4008::1` |
-| `[Telecom]` | CT-China-v6-B1 | `240e:4c:4808::1` |
-| `[Unicom]` | CU-China-v6-P1 | `2408:8899::8` |
-| `[Unicom]` | CU-China-v6-B1 | `2408:8888::8` |
-| `[Mobile]` | CM-China-v6-P1 | `2409:8088::a` |
-| `[Mobile]` | CM-China-v6-B1 | `2409:8088::b` |
-| `[Telecom]` | CT-Anhui-v6-B1 | `240e:46:4888::4888` |
-
-IPv6 entries run the same ordinary A-record benchmark over IPv6 transport. Before the full benchmark, reachability is checked with both A and AAAA queries against two domains. The queried A-record performance remains directly comparable with IPv4 resolvers, while the resolver connection itself uses IPv6.
-
-The Telecom, Unicom, and Mobile IPv6 entries are carrier recursive resolvers rather than unrestricted public DNS services. They may time out or return `REFUSED` outside the matching carrier or service region; this is a server access policy rather than an IPv6 transport failure.
-
-At startup, the script asks the operating system to select an IPv6 source address without sending a packet. If no route is available, it prints a warning and immediately skips IPv6 entries instead of waiting through repeated timeouts. Use `--force-ipv6` only when policy routing makes this automatic check inaccurate.
-
 ## DNS Records
 
 `resolvers.json` contains the DNS records used by the benchmark.
