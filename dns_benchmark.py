@@ -12,370 +12,102 @@ import urllib.parse
 import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
+from pathlib import Path
 
 
-RESOLVERS = {
-    "AliDNS-1": "223.5.5.5",
-    "AliDNS-2": "223.6.6.6",
-    "DNSPod-1": "119.29.29.29",
-    "Volcengine-IDC-1": "180.184.1.1",
-    "Volcengine-IDC-2": "180.184.2.2",
-    "Tsinghua-TUNA666": "101.6.6.6",
-    "USTC-LUG-1": "202.38.93.153",
-    "USTC-LUG-2": "202.141.162.123",
-    "HKBN-1": "203.80.96.10",
-    "HKBN-2": "203.80.96.9",
-    "HKBN-3": "203.186.94.20",
-    "HKBN-4": "203.186.94.22",
-    "HGC-1": "210.0.128.250",
-    "HGC-2": "210.0.128.251",
-    "I-CABLE-1": "61.10.0.130",
-    "I-CABLE-2": "61.10.1.130",
-    "CMHK-1": "203.142.100.18",
-    "CMHK-2": "203.142.100.21",
-    "BaiduDNS-1": "180.76.76.76",
-    "360DNS-1": "101.226.4.6",
-    "360DNS-2": "218.30.118.6",
-    "114DNS-Standard-1": "114.114.114.114",
-    "114DNS-Standard-2": "114.114.115.115",
-    "114DNS-Security-1": "114.114.114.119",
-    "114DNS-Security-2": "114.114.115.119",
-    "114DNS-Family-1": "114.114.114.110",
-    "114DNS-Family-2": "114.114.115.110",
-    "CNNIC-SDNS-1": "1.2.4.8",
-    "CNNIC-SDNS-2": "210.2.4.8",
-    "Auth-CN-1": "203.119.25.1",
-    "Auth-CN-2": "203.119.26.1",
-    "Auth-CN-3": "203.119.27.1",
-    "Auth-CN-4": "203.119.28.1",
-    "Auth-CN-5": "203.119.29.1",
-    "Auth-CN-6": "202.112.0.44",
-    "Auth-CN-7": "125.208.32.1",
-    "Auth-CN-8": "125.208.33.1",
-    "Auth-CN-9": "125.208.34.1",
-    "Auth-CN-10": "125.208.35.1",
-    "Auth-CN-11": "125.208.36.1",
-    "Auth-CN-12": "125.208.40.1",
-    "Auth-CN-13": "125.208.41.1",
-    "Auth-CN-14": "125.208.42.1",
-    "Auth-CN-15": "125.208.43.1",
-    "Auth-CN-16": "125.208.44.1",
-    "CT-Beijing-P1": "219.141.136.10",
-    "CT-Beijing-B1": "219.141.140.10",
-    "CT-Shanghai-P1": "202.96.209.133",
-    "CT-Shanghai-P2": "202.96.209.5",
-    "CT-Shanghai-B1": "116.228.111.118",
-    "CT-Shanghai-B2": "180.168.255.118",
-    "CT-Tianjin-P1": "219.150.32.132",
-    "CT-Tianjin-B1": "219.146.0.132",
-    "CT-Chongqing-P1": "61.128.192.68",
-    "CT-Chongqing-B1": "61.128.128.68",
-    "CT-Anhui-P1": "61.132.163.68",
-    "CT-Anhui-P2": "202.102.192.68",
-    "CT-Anhui-B1": "202.102.213.68",
-    "CT-Fujian-P1": "218.85.152.99",
-    "CT-Fujian-B1": "218.85.157.99",
-    "CT-Gansu-P1": "202.100.64.68",
-    "CT-Gansu-B1": "61.178.0.93",
-    "CT-Guangdong-P1": "202.96.128.86",
-    "CT-Guangdong-P2": "202.96.134.133",
-    "CT-Guangdong-P3": "202.96.154.8",
-    "CT-Guangdong-B1": "202.96.128.166",
-    "CT-Guangdong-B2": "202.96.128.68",
-    "CT-Guangdong-B3": "202.96.154.15",
-    "CT-Guangxi-P1": "202.103.225.68",
-    "CT-Guangxi-B1": "202.103.224.68",
-    "CT-Guizhou-P1": "202.98.192.67",
-    "CT-Guizhou-B1": "202.98.198.167",
-    "CT-Henan-P1": "222.88.88.88",
-    "CT-Henan-P2": "219.150.150.150",
-    "CT-Henan-B1": "222.85.85.85",
-    "CT-Henan-B2": "222.88.93.126",
-    "CT-Heilongjiang-P1": "219.147.198.230",
-    "CT-Heilongjiang-P2": "112.100.100.100",
-    "CT-Heilongjiang-B1": "219.147.198.242",
-    "CT-Hubei-P1": "202.103.24.68",
-    "CT-Hubei-P2": "202.103.44.150",
-    "CT-Hubei-B1": "202.103.0.68",
-    "CT-Hunan-P1": "59.51.78.211",
-    "CT-Hunan-P2": "222.246.129.80",
-    "CT-Hunan-B1": "59.51.78.210",
-    "CT-Hunan-B2": "222.246.129.81",
-    "CT-Jiangsu-P1": "218.2.2.2",
-    "CT-Jiangsu-P2": "61.147.37.1",
-    "CT-Jiangsu-B1": "218.4.4.4",
-    "CT-Jiangsu-B2": "218.2.135.1",
-    "CT-Jiangxi-P1": "202.101.224.69",
-    "CT-Jiangxi-P2": "202.101.226.69",
-    "CT-Jiangxi-B1": "202.101.226.68",
-    "CT-InnerMongolia-P1": "219.148.162.31",
-    "CT-InnerMongolia-P2": "222.74.1.200",
-    "CT-InnerMongolia-B1": "222.74.39.50",
-    "CT-Shandong-P1": "219.146.1.66",
-    "CT-Shandong-B1": "219.147.1.66",
-    "CT-Shanxi-P1": "59.49.49.49",
-    "CT-Shaanxi-P1": "218.30.19.40",
-    "CT-Shaanxi-B1": "61.134.1.4",
-    "CT-Sichuan-P1": "61.139.2.69",
-    "CT-Sichuan-B1": "218.6.200.139",
-    "CT-Yunnan-P1": "222.172.200.68",
-    "CT-Yunnan-B1": "61.166.150.123",
-    "CT-Zhejiang-P1": "202.101.172.35",
-    "CT-Zhejiang-P2": "61.153.81.75",
-    "CT-Zhejiang-P3": "60.191.134.206",
-    "CT-Zhejiang-B1": "202.101.172.47",
-    "CT-Zhejiang-B2": "61.153.177.196",
-    "CT-Zhejiang-B3": "60.191.244.5",
-    "CT-Hebei-P1": "222.222.202.202",
-    "CT-Hainan-P1": "202.100.192.68",
-    "CT-Liaoning-P1": "219.148.204.66",
-    "CT-Jilin-P1": "219.149.194.55",
-    "CT-Xinjiang-P1": "61.128.114.167",
-    "CU-Beijing-P1": "123.123.123.123",
-    "CU-Beijing-P2": "202.106.0.20",
-    "CU-Beijing-B1": "123.123.123.124",
-    "CU-Beijing-B2": "202.106.195.68",
-    "CU-Shanghai-P1": "210.22.70.3",
-    "CU-Shanghai-P2": "210.22.70.225",
-    "CU-Shanghai-B1": "210.22.84.3",
-    "CU-Tianjin-P1": "202.99.104.68",
-    "CU-Tianjin-B1": "202.99.96.68",
-    "CU-Chongqing-P1": "221.5.203.98",
-    "CU-Chongqing-B1": "221.7.92.98",
-    "CU-Guangdong-P1": "210.21.196.6",
-    "CU-Guangdong-P2": "210.21.4.130",
-    "CU-Guangdong-B1": "221.5.88.88",
-    "CU-Hebei-P1": "202.99.160.68",
-    "CU-Hebei-B1": "202.99.166.4",
-    "CU-Henan-P1": "202.102.224.68",
-    "CU-Henan-B1": "202.102.227.68",
-    "CU-Heilongjiang-P1": "202.97.224.69",
-    "CU-Heilongjiang-B1": "202.97.224.68",
-    "CU-Jilin-P1": "202.98.0.68",
-    "CU-Jilin-B1": "202.98.5.68",
-    "CU-Jiangsu-P1": "221.6.4.66",
-    "CU-Jiangsu-P2": "58.240.57.33",
-    "CU-Jiangsu-B1": "221.6.4.67",
-    "CU-InnerMongolia-P1": "202.99.224.68",
-    "CU-InnerMongolia-B1": "202.99.224.8",
-    "CU-Shandong-P1": "202.102.128.68",
-    "CU-Shandong-P2": "202.102.134.68",
-    "CU-Shandong-B1": "202.102.152.3",
-    "CU-Shandong-B2": "202.102.154.3",
-    "CU-Shanxi-P1": "202.99.192.66",
-    "CU-Shanxi-P2": "202.97.131.178",
-    "CU-Shanxi-B1": "202.99.192.68",
-    "CU-Shaanxi-P1": "221.11.1.67",
-    "CU-Shaanxi-B1": "221.11.1.68",
-    "CU-Sichuan-P1": "119.6.6.6",
-    "CU-Sichuan-B1": "124.161.87.155",
-    "CU-Zhejiang-P1": "221.12.1.227",
-    "CU-Zhejiang-P2": "221.12.33.227",
-    "CU-Zhejiang-B1": "221.12.65.227",
-    "CU-Liaoning-P1": "202.96.69.38",
-    "CU-Liaoning-B1": "202.96.64.68",
-    "CU-Guizhou-P1": "221.13.30.242",
-    "CU-Gansu-P1": "221.7.34.11",
-    "CU-Ningxia-P1": "221.199.12.157",
-    "CU-Jiangxi-P1": "220.248.192.12",
-    "CU-Guangxi-P1": "221.7.128.68",
-    "CU-Tibet-P1": "221.13.65.34",
-    "CU-Hainan-P1": "221.11.132.2",
-    "CU-Hunan-P1": "58.20.127.238",
-    "CU-Hubei-P1": "218.104.111.122",
-    "CU-Anhui-P1": "218.104.78.2",
-    "CU-Anhui-P2": "58.242.2.2",
-    "CU-Fujian-P1": "218.104.128.106",
-    "CU-Xinjiang-P1": "221.7.1.20",
-    "CU-Yunnan-P1": "221.3.131.11",
-    "CM-Beijing-P1": "211.138.30.66",
-    "CM-Beijing-P2": "211.136.28.231",
-    "CM-Beijing-P3": "211.136.28.237",
-    "CM-Beijing-P4": "221.130.32.103",
-    "CM-Beijing-P5": "221.130.32.106",
-    "CM-Beijing-P6": "221.176.3.70",
-    "CM-Beijing-P7": "221.176.3.76",
-    "CM-Beijing-P8": "221.176.3.83",
-    "CM-Beijing-P9": "221.176.4.6",
-    "CM-Beijing-P10": "221.176.4.12",
-    "CM-Beijing-P11": "221.176.4.18",
-    "CM-Beijing-P12": "221.130.33.52",
-    "CM-Beijing-B1": "211.136.17.107",
-    "CM-Beijing-B2": "211.136.28.234",
-    "CM-Beijing-B3": "211.136.28.228",
-    "CM-Beijing-B4": "221.130.32.100",
-    "CM-Beijing-B5": "221.130.32.109",
-    "CM-Beijing-B6": "221.176.3.73",
-    "CM-Beijing-B7": "221.176.3.79",
-    "CM-Beijing-B8": "221.176.3.85",
-    "CM-Beijing-B9": "221.176.4.9",
-    "CM-Beijing-B10": "221.176.4.15",
-    "CM-Beijing-B11": "221.176.4.21",
-    "CM-Beijing-B12": "221.179.155.193",
-    "CM-Shanghai-P1": "211.136.112.50",
-    "CM-Shanghai-P2": "211.136.18.171",
-    "CM-Shanghai-B1": "211.136.150.66",
-    "CM-Tianjin-P1": "211.137.160.50",
-    "CM-Tianjin-B1": "211.137.160.185",
-    "CM-Chongqing-P1": "218.201.4.3",
-    "CM-Chongqing-P2": "218.201.17.2",
-    "CM-Chongqing-B1": "218.201.21.132",
-    "CM-Anhui-P1": "211.138.180.2",
-    "CM-Anhui-B1": "211.138.180.3",
-    "CM-Shandong-P1": "218.201.96.130",
-    "CM-Shandong-P2": "218.201.124.18",
-    "CM-Shandong-B1": "211.137.191.26",
-    "CM-Shandong-B2": "218.201.124.19",
-    "CM-Shanxi-P1": "211.138.106.2",
-    "CM-Shanxi-P2": "211.138.106.18",
-    "CM-Shanxi-P3": "211.138.106.7",
-    "CM-Shanxi-B1": "211.138.106.3",
-    "CM-Shanxi-B2": "211.138.106.19",
-    "CM-Jiangsu-P1": "221.131.143.69",
-    "CM-Jiangsu-P2": "221.130.13.133",
-    "CM-Jiangsu-P3": "221.130.56.241",
-    "CM-Jiangsu-P4": "211.138.200.69",
-    "CM-Jiangsu-B1": "112.4.0.55",
-    "CM-Jiangsu-B2": "211.103.55.50",
-    "CM-Jiangsu-B3": "211.103.13.101",
-    "CM-Zhejiang-P1": "211.140.13.188",
-    "CM-Zhejiang-P2": "211.140.10.2",
-    "CM-Zhejiang-B1": "211.140.188.188",
-    "CM-Hunan-P1": "211.142.210.98",
-    "CM-Hunan-P2": "211.142.210.100",
-    "CM-Hunan-P3": "211.142.211.124",
-    "CM-Hunan-B1": "211.142.210.99",
-    "CM-Hunan-B2": "211.142.210.101",
-    "CM-Hunan-B3": "211.142.236.87",
-    "CM-Hubei-P1": "211.137.58.20",
-    "CM-Hubei-B1": "211.137.64.163",
-    "CM-Jiangxi-P1": "211.141.90.68",
-    "CM-Jiangxi-P2": "211.141.85.68",
-    "CM-Jiangxi-B1": "211.141.90.69",
-    "CM-Shaanxi-P1": "211.137.130.3",
-    "CM-Shaanxi-P2": "218.200.6.139",
-    "CM-Shaanxi-B1": "211.137.130.19",
-    "CM-Sichuan-P1": "211.137.82.4",
-    "CM-Sichuan-B1": "211.137.96.205",
-    "CM-Guangdong-P1": "211.136.20.203",
-    "CM-Guangdong-P2": "211.136.192.6",
-    "CM-Guangdong-P3": "211.139.163.6",
-    "CM-Guangdong-B1": "211.136.20.204",
-    "CM-Guangdong-B2": "211.139.136.68",
-    "CM-Guangdong-B3": "120.196.165.24",
-    "CM-Guangxi-P1": "211.138.245.180",
-    "CM-Guangxi-P2": "211.138.240.100",
-    "CM-Guangxi-B1": "211.136.17.108",
-    "CM-Guizhou-P1": "211.139.5.29",
-    "CM-Guizhou-B1": "211.139.5.30",
-    "CM-Fujian-P1": "211.138.151.161",
-    "CM-Fujian-P2": "218.207.217.241",
-    "CM-Fujian-P3": "211.143.181.178",
-    "CM-Fujian-P4": "218.207.128.4",
-    "CM-Fujian-P5": "211.138.145.194",
-    "CM-Fujian-B1": "211.138.156.66",
-    "CM-Fujian-B2": "218.207.217.242",
-    "CM-Fujian-B3": "211.143.181.179",
-    "CM-Fujian-B4": "218.207.130.118",
-    "CM-Hebei-P1": "211.143.60.56",
-    "CM-Hebei-P2": "111.11.1.1",
-    "CM-Hebei-B1": "211.138.13.66",
-    "CM-Henan-P1": "211.138.24.66",
-    "CM-Gansu-P1": "218.203.160.194",
-    "CM-Gansu-P2": "211.139.80.6",
-    "CM-Gansu-B1": "218.203.160.195",
-    "CM-Heilongjiang-P1": "211.137.241.34",
-    "CM-Heilongjiang-P2": "218.203.59.216",
-    "CM-Heilongjiang-B1": "211.137.241.35",
-    "CM-Jilin-P1": "211.141.16.99",
-    "CM-Jilin-B1": "211.141.0.99",
-    "CM-Liaoning-P1": "211.137.32.178",
-    "CM-Liaoning-B1": "211.140.197.58",
-    "CM-Yunnan-P1": "211.139.29.68",
-    "CM-Yunnan-P2": "211.139.29.150",
-    "CM-Yunnan-P3": "218.202.1.166",
-    "CM-Yunnan-B1": "211.139.29.69",
-    "CM-Yunnan-B2": "211.139.29.170",
-    "CM-Hainan-P1": "221.176.88.95",
-    "CM-Hainan-B1": "211.138.164.6",
-    "CM-InnerMongolia-P1": "211.138.91.1",
-    "CM-InnerMongolia-B1": "211.138.91.2",
-    "CM-Xinjiang-P1": "218.202.152.130",
-    "CM-Xinjiang-B1": "218.202.152.131",
-    "CM-Tibet-P1": "211.139.73.34",
-    "CM-Tibet-P2": "211.139.73.50",
-    "CM-Tibet-B1": "211.139.73.35",
-    "CM-Qinghai-P1": "211.138.75.123",
-    "CM-Ningxia-P1": "218.203.123.116",
-}
-
-# Based on current longest-prefix BGP origins. Public DNS services using their
-# own Alibaba, Tencent, Volcengine, Baidu, CNNIC, or 114DNS networks remain
-# untagged.
-CARRIER_NAME_PREFIXES = {
-    "CT-": "Telecom",
-    "CU-": "Unicom",
-    "CM-": "Mobile",
-}
-
-CARRIER_IPS = {
-    "Telecom": {
-        "202.141.162.123",  # USTC-LUG-2, currently announced by AS4134
-        "101.226.4.6",      # 360DNS-1, China Telecom Shanghai
-        "218.30.118.6",     # 360DNS-2, China Telecom
-    },
-    "Unicom": set(),
-    "Mobile": set(),
-    "Tietong": set(),
-    "Education": {
-        "101.6.6.6",        # Tsinghua University / CERNET
-        "202.38.93.153",    # USTC / CERNET
-        "202.112.0.44",     # Auth-CN / CERNET
-        "203.119.25.1",
-        "203.119.26.1",
-        "203.119.27.1",
-        "203.119.28.1",
-        "203.119.29.1",
-        "125.208.32.1",
-        "125.208.33.1",
-        "125.208.34.1",
-        "125.208.35.1",
-        "125.208.36.1",
-        "125.208.40.1",
-        "125.208.41.1",
-        "125.208.42.1",
-        "125.208.43.1",
-        "125.208.44.1",
-    },
-}
+DEFAULT_RESOLVERS_PATH = Path(__file__).with_name("resolvers.json")
+RESOLVERS = {}
 
 
-def _carrier_for_resolver(name, server):
-    for carrier, addresses in CARRIER_IPS.items():
-        if server in addresses:
-            return carrier
-    for prefix, carrier in CARRIER_NAME_PREFIXES.items():
-        if name.startswith(prefix):
-            return carrier
-    return None
+def load_resolvers(path):
+    resolver_path = Path(path)
+    with resolver_path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+
+    if data.get("schema_version") != 1:
+        raise ValueError("resolver JSON schema_version must be 1")
+    entries = data.get("resolvers")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("resolver JSON must contain a non-empty resolvers list")
+
+    resolvers = {}
+    addresses = {}
+    for index, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"resolver entry {index} must be an object")
+        name = entry.get("name")
+        server = entry.get("server")
+        label = entry.get("label")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"resolver entry {index} has an invalid name")
+        if not isinstance(server, str):
+            raise ValueError(f"resolver entry {index} has an invalid server")
+        if label is not None and (not isinstance(label, str) or not label.strip()):
+            raise ValueError(f"resolver entry {index} has an invalid label")
+
+        try:
+            address = ipaddress.ip_address(server)
+        except ValueError as exc:
+            raise ValueError(f"resolver entry {index} has an invalid IP address: {server}") from exc
+
+        display_name = f"[{label.strip()}] {name.strip()}" if label else name.strip()
+        normalized = address.compressed
+        if display_name in resolvers:
+            raise ValueError(f"duplicate resolver name: {display_name}")
+        if normalized in addresses:
+            raise ValueError(
+                f"duplicate resolver address {normalized}: {addresses[normalized]} and {display_name}"
+            )
+        resolvers[display_name] = normalized
+        addresses[normalized] = display_name
+
+    return resolvers
 
 
-def _add_carrier_tags(resolvers):
-    tagged = {}
-    for name, server in resolvers.items():
-        carrier = _carrier_for_resolver(name, server)
-        display_name = f"[{carrier}] {name}" if carrier else name
-        tagged[display_name] = server
-    return tagged
+def _socket_family(server):
+    return socket.AF_INET6 if ipaddress.ip_address(server).version == 6 else socket.AF_INET
 
 
-RESOLVERS = _add_carrier_tags(RESOLVERS)
+def _socket_address(server, port):
+    """Return the native address tuple required by a low-level UDP socket."""
+    if _socket_family(server) == socket.AF_INET6:
+        return server, port, 0, 0
+    return server, port
+
+
+def _asyncio_address(server, port):
+    """asyncio resolves flowinfo/scopeid itself and requires a host/port pair."""
+    return server, port
+
+
+def _same_ip(left, right):
+    try:
+        return ipaddress.ip_address(left) == ipaddress.ip_address(right)
+    except ValueError:
+        return False
+
+
+def _has_ipv6_route():
+    """Ask the OS to select a source address without sending network traffic."""
+    candidate = next(
+        (server for server in RESOLVERS.values() if _socket_family(server) == socket.AF_INET6),
+        None,
+    )
+    if candidate is None:
+        return False
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:
+            sock.connect(_socket_address(candidate, 53))
+            return not ipaddress.ip_address(sock.getsockname()[0]).is_unspecified
+    except OSError:
+        return False
 
 DOMAINS = [
     "baidu.com", "qq.com", "taobao.com", "jd.com", "bilibili.com",
     "douyin.com", "weibo.com", "zhihu.com", "gov.cn", "12306.cn",
     "microsoft.com", "github.com", "apple.com", "cloudflare.com",
     "wikipedia.org", "openai.com", "store.steampowered.com", "www.amap.com",
+    "sunlogin.oray.com", "parsec.app", "todesk.com",
 ]
 
 SENSITIVE_DOMAINS = [
@@ -413,11 +145,16 @@ def encode_name(name):
     return b"".join(bytes([len(label.encode("idna"))]) + label.encode("idna") for label in labels) + b"\x00"
 
 
-def make_query(name, dnssec=False):
+def make_query(name, dnssec=False, qtype="A"):
+    query_types = {"A": 1, "AAAA": 28}
+    try:
+        query_type = query_types[qtype.upper()]
+    except (AttributeError, KeyError):
+        raise ValueError(f"unsupported DNS query type: {qtype}") from None
     query_id = random.randrange(0, 65536)
     additional = 1 if dnssec else 0
     packet = struct.pack("!HHHHHH", query_id, 0x0100, 1, 0, 0, additional)
-    packet += encode_name(name) + struct.pack("!HH", 1, 1)
+    packet += encode_name(name) + struct.pack("!HH", query_type, 1)
     if dnssec:
         packet += b"\x00" + struct.pack("!HHIH", 41, 1232, 0x8000, 0)
     return query_id, packet
@@ -474,8 +211,8 @@ def parse_response(packet, expected_id):
     }
 
 
-def dns_query(server, name, timeout=1.5, tcp=False, dnssec=False):
-    query_id, packet = make_query(name, dnssec=dnssec)
+def dns_query(server, name, timeout=1.5, tcp=False, dnssec=False, qtype="A"):
+    query_id, packet = make_query(name, dnssec=dnssec, qtype=qtype)
     started = time.perf_counter()
     try:
         if tcp:
@@ -485,11 +222,11 @@ def dns_query(server, name, timeout=1.5, tcp=False, dnssec=False):
                 length_data = recv_exact(sock, 2)
                 response = recv_exact(sock, struct.unpack("!H", length_data)[0])
         else:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            with socket.socket(_socket_family(server), socket.SOCK_DGRAM) as sock:
                 sock.settimeout(timeout)
-                sock.sendto(packet, (server, 53))
+                sock.sendto(packet, _socket_address(server, 53))
                 response, peer = sock.recvfrom(4096)
-                if peer[0] != server:
+                if not _same_ip(peer[0], server):
                     raise ValueError("response came from unexpected server")
         elapsed_ms = (time.perf_counter() - started) * 1000
         parsed = parse_response(response, query_id)
@@ -567,6 +304,8 @@ class AsyncDnsClient:
     def __init__(self, server, timeout):
         self.server = server
         self.timeout = timeout
+        self.family = _socket_family(server)
+        self.remote_addr = _asyncio_address(server, 53)
         self.transport = None
         self.pending = {}
         self.fallback = False
@@ -576,13 +315,13 @@ class AsyncDnsClient:
         try:
             await loop.create_datagram_endpoint(
                 lambda: _DnsDatagramProtocol(self),
-                remote_addr=(self.server, 53), family=socket.AF_INET,
+                remote_addr=self.remote_addr, family=self.family,
             )
         except NotImplementedError:
             self.fallback = True
 
     def receive(self, data, address):
-        if address and address[0] != self.server or len(data) < 2:
+        if len(data) < 2 or (address and not _same_ip(address[0], self.server)):
             return
         query_id = struct.unpack("!H", data[:2])[0]
         future = self.pending.get(query_id)
@@ -594,16 +333,18 @@ class AsyncDnsClient:
             if not future.done():
                 future.set_exception(exc)
 
-    async def query(self, name, dnssec=False):
+    async def query(self, name, dnssec=False, qtype="A"):
         started = time.perf_counter()
         try:
             if self.fallback:
                 loop = asyncio.get_running_loop()
-                query = functools.partial(dns_query, self.server, name, self.timeout, False, dnssec)
+                query = functools.partial(
+                    dns_query, self.server, name, self.timeout, False, dnssec, qtype
+                )
                 return await loop.run_in_executor(None, query)
             loop = asyncio.get_running_loop()
             for _ in range(8):
-                query_id, packet = make_query(name, dnssec=dnssec)
+                query_id, packet = make_query(name, dnssec=dnssec, qtype=qtype)
                 if query_id not in self.pending:
                     break
             else:
@@ -944,13 +685,39 @@ async def collect_doh_references(domains, trusted_only_domains, timeout):
 
 async def run_resolver_async(label, server, args, token):
     print(f"Testing {label} {server}", flush=True)
+    ip_version = ipaddress.ip_address(server).version
+    if ip_version == 6 and not args.ipv6_enabled:
+        return {
+            "server": server,
+            "ip_version": ip_version,
+            "skip_reason": "no IPv6 route detected; use --force-ipv6 to override",
+            "skipped": True,
+        }
     client = AsyncDnsClient(server, args.timeout)
     try:
         await client.start()
-        reachability_samples = await asyncio.gather(*(client.query("baidu.com") for _ in range(3)))
+        reachability_probes = [
+            ("baidu.com", "A"),
+            ("baidu.com", "AAAA"),
+            ("qq.com", "A"),
+            ("qq.com", "AAAA"),
+        ]
+        reachability_samples = await asyncio.gather(*(
+            client.query(domain, qtype=qtype)
+            for domain, qtype in reachability_probes
+        ))
+        for sample, (domain, qtype) in zip(reachability_samples, reachability_probes):
+            sample.update({"domain": domain, "qtype": qtype})
         reachability = summarize_queries(reachability_samples)
         if not any(item["ok"] for item in reachability_samples):
-            return {"server": server, "reachability": reachability, "skipped": True}
+            return {
+                "server": server,
+                "ip_version": ip_version,
+                "reachability": reachability,
+                "reachability_samples": reachability_samples,
+                "skip_reason": "no A or AAAA probe received a DNS response",
+                "skipped": True,
+            }
         latency_summary, latency_samples = await run_latency_async(
             client, args.repeats, args.latency_workers
         )
@@ -959,13 +726,19 @@ async def run_resolver_async(label, server, args, token):
         for workers in args.concurrency_levels:
             concurrency[str(workers)] = await run_concurrency_async(client, workers, args.requests)
         return {
-            "server": server, "reachability": reachability,
+            "server": server,
+            "ip_version": ip_version,
+            "reachability": reachability,
+            "reachability_samples": reachability_samples,
             "latency": latency_summary, "latency_samples": latency_samples,
             "integrity": integrity, "concurrency": concurrency, "skipped": False,
         }
     except Exception as exc:
         return {
-            "server": server, "skipped": True,
+            "server": server,
+            "ip_version": ip_version,
+            "skip_reason": "transport setup failed",
+            "skipped": True,
             "error": f"{type(exc).__name__}: {exc}",
         }
     finally:
@@ -1017,6 +790,8 @@ def _metric_text(value, suffix=""):
 
 async def async_main(args):
     token = f"codex-dns-{int(time.time())}-{random.randrange(100000)}"
+    ipv6_route_detected = _has_ipv6_route()
+    args.ipv6_enabled = ipv6_route_detected or args.force_ipv6
     pollution_probe_domains = build_pollution_probe_domains(token)
     reference_domains = SENSITIVE_DOMAINS + pollution_probe_domains
     doh_task = asyncio.create_task(
@@ -1032,12 +807,18 @@ async def async_main(args):
             "parallel_resolvers": args.parallel_resolvers,
             "latency_workers": args.latency_workers,
             "timeout": args.timeout, "doh_timeout": args.doh_timeout,
+            "ipv6_route_detected": ipv6_route_detected,
+            "force_ipv6": args.force_ipv6,
+            "resolver_file": str(args.resolvers),
         },
         "resolvers": {}, "doh_references": {},
     }
     resolver_gate = asyncio.Semaphore(args.parallel_resolvers)
     completed = 0
     total = len(RESOLVERS)
+    if not ipv6_route_detected:
+        action = "testing anyway because --force-ipv6 is set" if args.force_ipv6 else "IPv6 resolvers will be skipped"
+        print(f"Warning: no usable IPv6 route was detected; {action}.", flush=True)
     print(
         f"Starting {total} resolver tests; DoH references are loading in background.",
         flush=True,
@@ -1135,7 +916,7 @@ def write_txt_report(output, path, levels):
         "Rank", "Name", "Resolver", "Success", "DNSMed(ms)", "P95(ms)",
         "Clean", "QPS@64", "128 OK", "QPS@128", "Status",
     ]
-    widths = [4, 34, 15, 9, 10, 9, 7, 9, 8, 9, 6]
+    widths = [4, 34, 39, 9, 10, 9, 7, 9, 8, 9, 6]
     alignments = ["right", "left", "left", "right", "right", "right", "right", "right", "right", "right", "center"]
     lines = [
         "DNS Benchmark Report",
@@ -1153,6 +934,8 @@ def write_txt_report(output, path, levels):
         "",
         "Notes:",
         "  Latency is DNS UDP round-trip time, not ICMP ping RTT; DNS caching and resolver processing can make it differ from ping.",
+        "  IPv6 reachability uses A and AAAA probes; ranked latency/concurrency tests remain A-record queries over IPv6 transport.",
+        "  IPv6 entries are skipped immediately when no route is detected unless --force-ipv6 is used.",
         "  128 OK = success rate at 128 concurrent requests; QPS columns count successful responses.",
         "  Clean score = NXDOMAIN 30% + pollution probes 30% + sensitive domains 25% + known answers 5% + valid DNSSEC 5% + bogus DNSSEC blocked 3% + TCP 2%.",
         "  Pollution probes use randomized sensitive subdomains and trusted DoH baselines; unavailable baseline weights are excluded.",
@@ -1163,6 +946,7 @@ def write_txt_report(output, path, levels):
 
 
 def main():
+    global RESOLVERS
     parser = argparse.ArgumentParser()
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--requests", type=int, default=192)
@@ -1171,6 +955,8 @@ def main():
     parser.add_argument("--latency-workers", type=int, default=4, help="Low-concurrency workers per resolver for ordinary latency samples (default: 4)")
     parser.add_argument("--timeout", type=float, default=1.5)
     parser.add_argument("--doh-timeout", type=float, default=3.0, help="Timeout for each DNS-over-HTTPS reference query (default: 3.0)")
+    parser.add_argument("--force-ipv6", action="store_true", help="Test IPv6 resolvers even when automatic route detection fails")
+    parser.add_argument("--resolvers", type=Path, default=DEFAULT_RESOLVERS_PATH, help="Resolver JSON path (default: resolvers.json beside the script)")
     parser.add_argument("--output", required=True, help="TXT report path")
     parser.add_argument("--json-output", help="Optional full JSON detail path")
     args = parser.parse_args()
@@ -1181,6 +967,10 @@ def main():
         args.concurrency_levels = parse_concurrency_levels(args.concurrency_levels)
     except ValueError as exc:
         parser.error(str(exc))
+    try:
+        RESOLVERS = load_resolvers(args.resolvers)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(f"cannot load resolver JSON {args.resolvers}: {exc}")
     asyncio.run(async_main(args))
 
 
